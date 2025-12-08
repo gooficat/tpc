@@ -64,18 +64,29 @@ void parse_line(const char* content, struct asm_unit* output)
       op.args[1] = decide_arg(toks[2]);
 
    op.opcode = find_opcode(toks[0]);
-
    if (op.len == 2)
    {
-      op.mod = 0;
+      switch (op.args[0].type)
+      {
+      case ARG_REG:
+         op.opcode += op.args[0].value;  // 1 reg arg
+         break;
+      case ARG_IMM:
+         break;  // 1 imm arg. like "push 236"
+      case ARG_MEM:
+         break;  // arg like "pop @sp+4".
+      default:
+         break;
+      }
    }
    if (op.len == 3)
    {
-      op.mod = 0;  // TODO
-      if (op.args[0].type == ARG_REG && op.args[1].type == ARG_REG)
+      if (op.args[0].type == ARG_REG)
       {
-         op.mod |= SET(7, 1) | SET(8, 1);
-         op.mod |= SET(3, op.args[0].value) << 3;
+      }
+      else
+      {
+         // should be a memory address otherwise
       }
    }
 
