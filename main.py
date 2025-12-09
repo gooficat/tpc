@@ -1,6 +1,11 @@
 from instructions import instructions, registers
 
-content : str ="""add ax 5"""
+content : str ="""\
+mov bx 5
+push bx
+pop ax
+retn\
+"""
 
 lines : list = content.splitlines()
 
@@ -11,6 +16,7 @@ class Operand:
         self.type : str = ''
         self.value : bytearray = bytearray()
         self.min_bytes : int = 0
+        self.offset : int = 0
 
 def gen_operand(token : str) -> Operand:
     out : Operand = Operand()
@@ -40,24 +46,23 @@ for line in lines:
 
     for instr in instructions:
         if tokens[0] == instr[0]: instruction.append(instr[1])
+        break
 
-    match(len(tokens)):
-        case 3:
-            break
-        case 2:
-            operand : Operand = gen_operand(tokens[1])
-            if (operand.type == 'reg'):
-                instruction.extend(operand.value)
-            break
-        case 1:
-            ops : list[Operand] = [
-                gen_operand(tokens[1]),
-                gen_operand(tokens[2])
-            ]
-            if (ops[0].type == 'reg'):
-                pass
-            break
+    ops : list[Operand] = []
 
+    for tk in tokens[1:]:
+        if tk: ops.append(gen_operand(tk))
+
+    
+    if len(ops) == 2: # 2 operands, like "mov ax, [sp+4]"
+        pass
+    elif len(ops) == 1: # 1 operand, like "push ax" or "call 0x1212"
+        if ops[0].type == 'reg':
+            instruction[0] += ops[0].value[1] # add reg directly to operand
+        elif ops[0].type == 'imm':
+            instruction.extend(ops[0].value)
+
+    # otherwise, there are no operands, like "ret"
 
     output.extend(instruction)
 
