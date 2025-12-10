@@ -1,5 +1,6 @@
 instructions : list[tuple[str, int]] = [
     ("add", 0x00),
+    ("xor", 0x30),
     ("push", 0x06),
     ("pop", 0x07),
     ("mov", 0x88),

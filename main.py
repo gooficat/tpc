@@ -41,24 +41,43 @@ def gen_operand(token : str) -> Operand:
     return out
 
 for line in lines:
-    tokens : list[str] = line.split()
-    instruction : bytearray = bytearray()
+    tokens : list[str] = line.split() # split by space
+    instruction : bytearray = bytearray() # actual bytes of the output instruction
 
     for instr in instructions:
-        if tokens[0] == instr[0]: instruction.append(instr[1])
-        break
+        if tokens[0] == instr[0]:
+            instruction.append(instr[1])
+            break
 
     ops : list[Operand] = []
 
     for tk in tokens[1:]:
-        if tk: ops.append(gen_operand(tk))
+        if tk: ops.append(gen_operand(tk)) # generate the operands
 
     
     if len(ops) == 2: # 2 operands, like "mov ax, [sp+4]"
-        pass
+        if ops[0].type == 'reg':
+            instruction.append(0)
+            instruction[1] += (ops[0].value[0] << 3) # modrm reg TODO change this, it must be the second byte
+        if ops[1].type == 'reg':
+            instruction[1] |= int(0b11).to_bytes(1, 'little')[0]
+        elif ops[1].type == 'imm':
+            instruction.extend(ops[1].value)
+        elif ops[1].type == 'mem':
+            mod : int = 0
+            if ops[1].offset < 256:
+                mod = 0b01
+                instruction.append(ops[1].value[0])
+            elif ops[1].offset:
+                mod = 0b10
+                instruction.extend(ops[1].value)
+            instruction[1] |= 0b110 # direct memory with no offset / base
+
+            instruction[1] |= mod.to_bytes(1, 'little')[0]
+
     elif len(ops) == 1: # 1 operand, like "push ax" or "call 0x1212"
         if ops[0].type == 'reg':
-            instruction[0] += ops[0].value[1] # add reg directly to operand
+            instruction[0] += ops[0].value[0] # add reg directly to operand
         elif ops[0].type == 'imm':
             instruction.extend(ops[0].value)
 
