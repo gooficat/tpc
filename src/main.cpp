@@ -79,7 +79,7 @@ static const std::unordered_map<std::string, std::uint8_t> mnemonics = {
     {"mul", 0xF7},     //
     {"xor", 0x30},     //
     {"int", 0xCD},     //
-    {"jmpb", 0xEB},    //
+    {"jmpn", 0xEB},    //
                        //
     {"mov_ax", 0xB8},  //
     {"mov_cx", 0xB9},  //
@@ -198,9 +198,11 @@ class Instruction
    Instruction(const std::string& line);
 
    void Print() const;
-   EncodedInstruction Encode() const;
+   EncodedInstruction Encode(const std::unordered_map<std::string, std::uint64_t>& labels,
+                             size_t output_len) const;
 
-   std::vector<std::uint8_t> Assemble() const;
+   std::vector<std::uint8_t> Assemble(const std::unordered_map<std::string, std::uint64_t>& labels,
+                                      size_t output_len) const;
 };
 
 EncodedInstruction SpecialFill(const Instruction& instruction)
@@ -257,7 +259,8 @@ void Instruction::Print() const
       operand.Print();
 }
 
-EncodedInstruction Instruction::Encode() const
+EncodedInstruction Instruction::Encode(const std::unordered_map<std::string, std::uint64_t>& labels,
+                                       size_t output_len) const
 {
    EncodedInstruction encoded{};
 
@@ -321,10 +324,11 @@ EncodedInstruction Instruction::Encode() const
    return encoded;
 }
 
-std::vector<std::uint8_t> Instruction::Assemble() const
+std::vector<std::uint8_t> Instruction::Assemble(
+    const std::unordered_map<std::string, std::uint64_t>& labels, size_t output_len) const
 {
    auto out = std::vector<std::uint8_t>();
-   auto encoded = Encode();
+   auto encoded = Encode(labels, output_len);
 
    for (const auto& pref : encoded.prefixes)
       out.push_back(pref);
@@ -353,6 +357,10 @@ int main(int argc, char* argv[])
 
    auto output = std::vector<std::uint8_t>();
 
+   infile.seekg(infile.beg);
+
+   auto labels = std::unordered_map<std::string, std::uint64_t>();
+
    size_t line_num = 0;
    while (std::getline(infile, line))
    {
@@ -363,6 +371,7 @@ int main(int argc, char* argv[])
       case '.':
          break;  // denoter
       case ':':
+         labels.insert({line.substr(1), output.size()});
          break;  // label
       default:
          std::cout << line_num++ << ": " << line << std::endl;
@@ -371,7 +380,7 @@ int main(int argc, char* argv[])
 
          instruction.Print();
 
-         auto assembled = instruction.Assemble();
+         auto assembled = instruction.Assemble(labels, output.size());
          output.insert(output.end(), assembled.begin(), assembled.end());
          break;
       }
