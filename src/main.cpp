@@ -226,6 +226,8 @@ Instruction::Instruction(const std::string& line)
    size_t op_index = line.find(' ');
    mnemonic = line.substr(0, op_index);
 
+   mode = ByteMode::BYTE;
+
    size_t arg_index = op_index;
    while (arg_index != std::string::npos)
    {
@@ -233,7 +235,10 @@ Instruction::Instruction(const std::string& line)
       std::string arg = line.substr(op_index + 1, arg_index - op_index - 1);
       op_index = line.find(' ', op_index + 1);
 
-      operands.push_back(Operand(arg));
+      auto operand = Operand(arg);
+      operands.push_back(operand);
+      if (int(operand.min_mode) > int(mode))
+         mode = operand.min_mode;
    }
 }
 
@@ -297,7 +302,7 @@ EncodedInstruction Instruction::Encode() const
             encoded.immediate.push_back(operands[0].value << (8 * i) & 0xFF);
          break;
       case OperandType::REGISTER:
-         encoded.opcode += operands[0].value;
+         encoded.opcode += operands[0].value & 0xFF;
          break;
       case OperandType::MEMORY:
          //
