@@ -6,3 +6,6 @@ xor ax, ax
 mov_ax 0x0010
 int 0x10
 jmpn 0
+.times 501, .db 0
+.db 0xaa
+.db 0x55

@@ -139,7 +139,7 @@ class Operand
          type = OperandType::IMMEDIATE;
          if (arg.size() < 3 || arg.at(1) != 'x')
          {
-            value = std::stoull(arg, nullptr, 0);
+            value = std::strtoull(arg.c_str(), nullptr, 0);
             if (value <= UINT8_MAX)
                min_mode = ByteMode::BYTE;
             else if (value <= UINT16_MAX)
@@ -205,32 +205,6 @@ class Instruction
                                       size_t output_len) const;
 };
 
-EncodedInstruction SpecialFill(const Instruction& instruction)
-{
-   auto out = EncodedInstruction{};
-   out.has_modregrm = false;
-   out.has_sib = false;
-   out.opcode = instruction.operands[0].value & 0xFF;
-   for (int i = 1; i < int(instruction.mode); i++)
-   {
-      out.immediate.push_back((instruction.operands[0].value << (8 * i)) & 0xFF);
-   }
-   for (size_t i = 0; i < instruction.operands[1].value - 1; i++)
-   {
-      for (int j = 0; j < int(instruction.operands[0].min_mode); j++)
-      {
-         out.immediate.push_back((instruction.operands[0].value << (8 * j)) & 0xFF);
-      }
-   }
-
-   return out;
-}
-
-static const std::unordered_map<std::string, EncodedInstruction (*)(const Instruction&)>
-    special_instructions{
-        {"fill", SpecialFill}  //
-    };
-
 Instruction::Instruction(const std::string& line)
 {
    size_t op_index = line.find(' ');
@@ -264,10 +238,7 @@ EncodedInstruction Instruction::Encode(const std::unordered_map<std::string, std
 {
    EncodedInstruction encoded{};
 
-   if (mnemonics.find(mnemonic) != mnemonics.end())
-      encoded.opcode = mnemonics.at(mnemonic);
-   else
-      return special_instructions.at(mnemonic)(*this);
+   encoded.opcode = mnemonics.at(mnemonic);
 
    ByteMode bm = ByteMode::BYTE;
 
@@ -347,10 +318,71 @@ std::vector<std::uint8_t> Instruction::Assemble(
    return out;
 }
 
+void ParseDenoterLine(const std::string& line,
+                      std::unordered_map<std::string, std::uint64_t>& labels,
+                      std::vector<std::uint8_t>& output);
+
+void ParseLine(const std::string& line, std::unordered_map<std::string, std::uint64_t>& labels,
+               std::vector<std::uint8_t>& output)
+{
+   switch (line.at(0))
+   {
+   case ';':  // comment
+      break;
+   case '.':  // denoter
+      ParseDenoterLine(line, labels, output);
+      break;
+   case ':':
+      labels.insert({line.substr(1), output.size()});
+      break;  // label
+   default:
+      std::cout << "line:" << line << std::endl;
+
+      Instruction instruction(line);
+
+      instruction.Print();
+
+      auto assembled = instruction.Assemble(labels, output.size());
+      output.insert(output.end(), assembled.begin(), assembled.end());
+      break;
+   }
+}
+
+void ParseDenoterLine(const std::string& line,
+                      std::unordered_map<std::string, std::uint64_t>& labels,
+                      std::vector<std::uint8_t>& output)
+{
+   auto op_index = line.find(' ');
+   auto mnemonic = line.substr(1, op_index - 1);
+
+   std::cout << "Special line " << line << std::endl;
+   std::cout << "Mnemonic |" << mnemonic << "|" << std::endl;
+
+   if (mnemonic == "db")
+   {
+      auto op1_end = line.find(' ', op_index);
+      auto op1 = line.substr(op_index + 1, op1_end + 2);
+      std::cout << "Denote byte: " << op1 << std::endl;
+      output.push_back(static_cast<std::uint8_t>(std::strtoul(op1.c_str(), nullptr, 0)));
+   }
+
+   else if (mnemonic == "times")
+   {
+      std::cout << "Multiplier denoter" << std::endl;
+      auto op1_end = line.find(' ', op_index + 1);
+      auto op1 = line.substr(op_index + 1, op1_end + 2);  // comma space for the sake of consistency
+
+      auto repeats = std::stoull(op1);
+
+      for (auto i = 0llu; i < repeats; i++)
+         ParseLine(line.substr(op1_end + 1), labels, output);
+   }
+}
+
 int main(int argc, char* argv[])
 {
-   assert(argc == 3 && "Wrong arguments! Pattern is /path/to/tpc <input file> <output file>");
-   std::ifstream infile(argv[1]);
+   // assert(argc == 3 && "Wrong arguments! Pattern is /path/to/tpc <input file> <output file>");
+   std::ifstream infile(argc == 3 ? argv[1] : "C:/msys64/home/User/tpc/test.asm");
    assert(infile && "Could not find the file specified");
 
    std::string line;
@@ -361,33 +393,14 @@ int main(int argc, char* argv[])
 
    auto labels = std::unordered_map<std::string, std::uint64_t>();
 
-   size_t line_num = 0;
    while (std::getline(infile, line))
    {
-      switch (line.at(0))
-      {
-      case ';':  // comment
-         break;
-      case '.':
-         break;  // denoter
-      case ':':
-         labels.insert({line.substr(1), output.size()});
-         break;  // label
-      default:
-         std::cout << line_num++ << ": " << line << std::endl;
-
-         Instruction instruction(line);
-
-         instruction.Print();
-
-         auto assembled = instruction.Assemble(labels, output.size());
-         output.insert(output.end(), assembled.begin(), assembled.end());
-         break;
-      }
+      ParseLine(line, labels, output);
    }
    infile.close();
 
-   std::ofstream outfile(argv[2], std::ios::binary);
+   std::ofstream outfile(argc == 3 ? argv[2] : "C:/msys64/home/User/tpc/test.bin",
+                         std::ios::binary);
    assert(outfile && "Could not find the file specified");
    for (const auto& a : output)
       std::cout << out_hex(a) << " ";
