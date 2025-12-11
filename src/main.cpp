@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -136,16 +137,23 @@ class Operand
       else
       {
          type = OperandType::IMMEDIATE;
-         if (arg.size() < 3 || arg.at(2) != 'x')
+         if (arg.size() < 3 || arg.at(1) != 'x')
+         {
             value = std::stoull(arg, nullptr, 0);
-         if (value <= UINT8_MAX)
-            min_mode = ByteMode::BYTE;
-         else if (value <= UINT16_MAX)
-            min_mode = ByteMode::WORD;
-         else if (value <= UINT32_MAX)
-            min_mode = ByteMode::DWORD;
+            if (value <= UINT8_MAX)
+               min_mode = ByteMode::BYTE;
+            else if (value <= UINT16_MAX)
+               min_mode = ByteMode::WORD;
+            else if (value <= UINT32_MAX)
+               min_mode = ByteMode::DWORD;
+            else
+               min_mode = ByteMode::QWORD;
+         }
          else
-            min_mode = ByteMode::QWORD;
+         {
+            min_mode = ByteMode((arg.size() - 2) / 2);
+            value = std::stoull(arg, nullptr, 0);
+         }
       }
    }
 
@@ -218,7 +226,6 @@ EncodedInstruction SpecialFill(const Instruction& instruction)
 
 static const std::unordered_map<std::string, EncodedInstruction (*)(const Instruction&)>
     special_instructions{
-        //
         {"fill", SpecialFill}  //
     };
 
@@ -300,7 +307,7 @@ EncodedInstruction Instruction::Encode() const
       {
       case OperandType::IMMEDIATE:
          for (int i = 0; i < int(bm); i++)
-            encoded.immediate.push_back(operands[0].value << (8 * i) & 0xFF);
+            encoded.immediate.push_back((operands[0].value << (8 * i)) & 0xFF);
          break;
       case OperandType::REGISTER:
          encoded.opcode += operands[0].value & 0xFF;
