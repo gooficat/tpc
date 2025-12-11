@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -335,9 +336,11 @@ std::vector<std::uint8_t> Instruction::Assemble() const
    return out;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-   std::ifstream infile("C:\\msys64\\home\\User\\tpc\\test.asm");
+   assert(argc == 3 && "Wrong arguments! Pattern is /path/to/tpc <input file> <output file>");
+   std::ifstream infile(argv[1]);
+   assert(infile && "Could not find the file specified");
 
    std::string line;
 
@@ -368,7 +371,8 @@ int main()
    }
    infile.close();
 
-   std::ofstream outfile("C:\\msys64\\home\\User\\tpc\\test.bin", std::ios::binary);
+   std::ofstream outfile(argv[2], std::ios::binary);
+   assert(outfile && "Could not find the file specified");
    for (const auto& a : output)
       std::cout << out_hex(a) << " ";
    std::cout << std::endl;

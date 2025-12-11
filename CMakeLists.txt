@@ -16,12 +16,11 @@ cmake_minimum_required(VERSION 3.15)
     add_executable(TPC 
             src/main.cpp
     )
-        
     # Compiler-specific options
     if(MSVC)
-        target_compile_options(TPC PRIVATE /W4 /fsanitize=address)
+        target_compile_options(TPC PRIVATE /W4) # /fsanitize=address)
     else()
-        target_compile_options(TPC PRIVATE -Wall -Wextra -Wpedantic -fsanitize=address)
+        target_compile_options(TPC PRIVATE -Wall -Wextra -Wpedantic) # -fsanitize=address)
     endif()
         
     # Debug configuration
