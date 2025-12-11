@@ -23,6 +23,8 @@ enum struct ByteMode : int
    QWORD = 8,
 };
 
+static const ByteMode CURRENT_MODE = ByteMode::WORD;  // indicate that we are on "bits 16"
+
 class Register
 {
  public:
@@ -39,15 +41,57 @@ static const std::unordered_map<std::string, Register> registers = {
     {"rbp", {5, ByteMode::QWORD}},  //
     {"rsi", {6, ByteMode::QWORD}},  //
     {"rdi", {7, ByteMode::QWORD}},  //
+
+    {"eax", {0, ByteMode::DWORD}},  //
+    {"ecx", {1, ByteMode::DWORD}},  //
+    {"edx", {2, ByteMode::DWORD}},  //
+    {"ebx", {3, ByteMode::DWORD}},  //
+    {"esp", {4, ByteMode::DWORD}},  //
+    {"ebp", {5, ByteMode::DWORD}},  //
+    {"esi", {6, ByteMode::DWORD}},  //
+    {"edi", {7, ByteMode::DWORD}},  //
+
+    {"ax", {0, ByteMode::WORD}},  //
+    {"cx", {1, ByteMode::WORD}},  //
+    {"dx", {2, ByteMode::WORD}},  //
+    {"bx", {3, ByteMode::WORD}},  //
+    {"sp", {4, ByteMode::WORD}},  //
+    {"bp", {5, ByteMode::WORD}},  //
+    {"si", {6, ByteMode::WORD}},  //
+    {"di", {7, ByteMode::WORD}},  //
+
+    {"ah", {0, ByteMode::BYTE}},  //
+    {"ch", {1, ByteMode::BYTE}},  //
+    {"dh", {2, ByteMode::BYTE}},  //
+    {"bh", {3, ByteMode::BYTE}},  //
+    {"al", {0, ByteMode::BYTE}},  //
+    {"cl", {1, ByteMode::BYTE}},  //
+    {"dl", {2, ByteMode::BYTE}},  //
+    {"bl", {3, ByteMode::BYTE}},  //
 };
 
 static const std::unordered_map<std::string, std::uint8_t> mnemonics = {
-    {"mov", 0x89},  //
-    {"add", 0x01},  //
-    {"sub", 0x29},  //
-    {"mul", 0xF7},  //
-    {"div", 0xF7},  //
-};
+    {"mov", 0x89},     //
+    {"add", 0x01},     //
+    {"sub", 0x29},     //
+    {"mul", 0xF7},     //
+    {"xor", 0x30},     //
+    {"int", 0xCD},     //
+    {"jmp", 0xE9},     //
+                       //
+    {"mov_ax", 0xB8},  //
+    {"mov_cx", 0xB9},  //
+    {"mov_dx", 0xBA},  //
+    {"mov_bx", 0xBB},  //
+    {"mov_sp", 0xBC},  //
+    {"mov_bp", 0xBD},  //
+    {"mov_si", 0xBE},  //
+    {"mov_di", 0xBF},  //
+
+    {"nop", 0x90},
+
+};  // I should probably add a way to have the same mnemonic for different instructions depending on
+    // their "profile", so that i can have the different movs share a name, just like in nasm.
 
 class Operand
 {
@@ -91,7 +135,8 @@ class Operand
       else
       {
          type = OperandType::IMMEDIATE;
-         value = std::stoull(arg, nullptr, 0);
+         if (arg.size() < 3 || arg.at(2) != 'x')
+            value = std::stoull(arg, nullptr, 0);
          if (value <= UINT8_MAX)
             min_mode = ByteMode::BYTE;
          else if (value <= UINT16_MAX)
@@ -182,11 +227,15 @@ class Instruction
       case ByteMode::QWORD:
          mode_pref = 0x48;
          break;
+      case ByteMode::DWORD:
+         break;
       case ByteMode::WORD:
          mode_pref = 0x66;
-      default:;
+         break;
+      case ByteMode::BYTE:
+         break;
       }
-      if (mode_pref)
+      if (mode_pref && CURRENT_MODE != bm)
          encoded.prefixes.push_back(mode_pref);
 
       if (operands.size() == 2)
@@ -194,7 +243,7 @@ class Instruction
          encoded.has_modregrm = true;
          if (operands[0].type == OperandType::REGISTER && operands[1].type == OperandType::REGISTER)
          {
-            encoded.modregrm = 0b11000000;
+            encoded.modregrm = 0b11 << 6;
             encoded.modregrm |= operands[1].value << 3;
             encoded.modregrm |= operands[0].value;
          }
@@ -204,7 +253,8 @@ class Instruction
          switch (operands[0].type)
          {
          case OperandType::IMMEDIATE:
-            //
+            for (int i = 0; i < int(bm); i++)
+               encoded.immediate.push_back(operands[0].value >> (8 * i) & 0xFF);
             break;
          case OperandType::REGISTER:
             //
@@ -247,6 +297,8 @@ int main()
 
    std::string line;
 
+   auto output = std::vector<std::uint8_t>();
+
    size_t line_num = 0;
    while (std::getline(infile, line))
    {
@@ -257,10 +309,14 @@ int main()
       instruction.Print();
 
       auto assembled = instruction.Assemble();
-
-      for (const auto& a : assembled)
-         std::cout << out_hex(a) << std::endl;
+      output.insert(output.end(), assembled.begin(), assembled.end());
    }
+   infile.close();
+
+   std::ofstream outfile("C:\\msys64\\home\\User\\tpc\\test.bin", std::ios::binary);
+   for (const auto& a : output)
+      std::cout << out_hex(a) << std::endl;
+   outfile.write(reinterpret_cast<const char*>(output.data()), output.size());
 
    return 0;
 }
