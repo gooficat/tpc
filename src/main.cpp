@@ -1,12 +1,12 @@
-#include <array>
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#define out_hex(v) "0x" << std::hex << size_t(v)
+#define out_hex(v) std::hex << std::setw(2) << std::setfill('0') << size_t(v)
 
 enum class OperandType
 {
@@ -77,7 +77,7 @@ static const std::unordered_map<std::string, std::uint8_t> mnemonics = {
     {"mul", 0xF7},     //
     {"xor", 0x30},     //
     {"int", 0xCD},     //
-    {"jmp", 0xE9},     //
+    {"jmpb", 0xEB},    //
                        //
     {"mov_ax", 0xB8},  //
     {"mov_cx", 0xB9},  //
@@ -186,110 +186,149 @@ class Instruction
    ByteMode mode;
    std::vector<Operand> operands;
 
-   Instruction(const std::string& line)
-   {
-      size_t op_index = line.find(' ');
-      mnemonic = line.substr(0, op_index);
+   Instruction(const std::string& line);
 
-      size_t arg_index = op_index;
-      while (arg_index != std::string::npos)
-      {
-         arg_index = line.find(',', arg_index + 1);
-         std::string arg = line.substr(op_index + 1, arg_index - op_index - 1);
-         op_index = line.find(' ', op_index + 1);
+   void Print() const;
+   EncodedInstruction Encode() const;
 
-         operands.push_back(Operand(arg));
-      }
-   }
-
-   void Print() const
-   {
-      std::cout << "Mnemonic: " << mnemonic << std::endl;
-      for (const auto& operand : operands)
-         operand.Print();
-   }
-
-   EncodedInstruction Encode() const
-   {
-      EncodedInstruction encoded{};
-
-      encoded.opcode = mnemonics.at(mnemonic);
-
-      ByteMode bm = ByteMode::BYTE;
-
-      for (const auto& op : operands)
-         if (int(op.min_mode) > int(bm))
-            bm = op.min_mode;
-
-      std::uint8_t mode_pref = 0x00;
-      switch (bm)
-      {
-      case ByteMode::QWORD:
-         mode_pref = 0x48;
-         break;
-      case ByteMode::DWORD:
-         break;
-      case ByteMode::WORD:
-         mode_pref = 0x66;
-         break;
-      case ByteMode::BYTE:
-         break;
-      }
-      if (mode_pref && CURRENT_MODE != bm)
-         encoded.prefixes.push_back(mode_pref);
-
-      if (operands.size() == 2)
-      {
-         encoded.has_modregrm = true;
-         if (operands[0].type == OperandType::REGISTER && operands[1].type == OperandType::REGISTER)
-         {
-            encoded.modregrm = 0b11 << 6;
-            encoded.modregrm |= operands[1].value << 3;
-            encoded.modregrm |= operands[0].value;
-         }
-      }
-      else if (operands.size() == 1)
-      {
-         switch (operands[0].type)
-         {
-         case OperandType::IMMEDIATE:
-            for (int i = 0; i < int(bm); i++)
-               encoded.immediate.push_back(operands[0].value >> (8 * i) & 0xFF);
-            break;
-         case OperandType::REGISTER:
-            //
-            break;
-         case OperandType::MEMORY:
-            //
-            break;
-         }
-      }
-
-      return encoded;
-   }
-
-   std::vector<std::uint8_t> Assemble() const
-   {
-      auto out = std::vector<std::uint8_t>();
-      auto encoded = Encode();
-
-      for (const auto& pref : encoded.prefixes)
-         out.push_back(pref);
-
-      out.push_back(encoded.opcode);
-
-      if (encoded.has_modregrm)
-         out.push_back(encoded.modregrm);
-
-      for (const auto& dis : encoded.displacement)
-         out.push_back(dis);
-
-      for (const auto& imm : encoded.immediate)
-         out.push_back(imm);
-
-      return out;
-   }
+   std::vector<std::uint8_t> Assemble() const;
 };
+
+EncodedInstruction SpecialFill(const Instruction& instruction)
+{
+   auto out = EncodedInstruction{};
+   out.has_modregrm = false;
+   out.has_sib = false;
+   out.opcode = instruction.operands[0].value & 0xFF;
+   for (int i = 1; i < int(instruction.mode); i++)
+   {
+      out.immediate.push_back((instruction.operands[0].value << (8 * i)) & 0xFF);
+   }
+   for (size_t i = 0; i < instruction.operands[1].value - 1; i++)
+   {
+      for (int j = 0; j < int(instruction.mode); j++)
+      {
+         out.immediate.push_back((instruction.operands[0].value << (8 * j)) & 0xFF);
+      }
+   }
+
+   return out;
+}
+
+static const std::unordered_map<std::string, EncodedInstruction (*)(const Instruction&)>
+    special_instructions{
+        //
+        {"fill", SpecialFill}  //
+    };
+
+Instruction::Instruction(const std::string& line)
+{
+   size_t op_index = line.find(' ');
+   mnemonic = line.substr(0, op_index);
+
+   size_t arg_index = op_index;
+   while (arg_index != std::string::npos)
+   {
+      arg_index = line.find(',', arg_index + 1);
+      std::string arg = line.substr(op_index + 1, arg_index - op_index - 1);
+      op_index = line.find(' ', op_index + 1);
+
+      operands.push_back(Operand(arg));
+   }
+}
+
+void Instruction::Print() const
+{
+   std::cout << "Mnemonic: " << mnemonic << std::endl;
+   for (const auto& operand : operands)
+      operand.Print();
+}
+
+EncodedInstruction Instruction::Encode() const
+{
+   EncodedInstruction encoded{};
+
+   if (mnemonics.find(mnemonic) != mnemonics.end())
+      encoded.opcode = mnemonics.at(mnemonic);
+   else
+      return special_instructions.at(mnemonic)(*this);
+
+   ByteMode bm = ByteMode::BYTE;
+
+   for (const auto& op : operands)
+      if (int(op.min_mode) > int(bm))
+         bm = op.min_mode;
+
+   std::uint8_t mode_pref = 0x00;
+   switch (bm)
+   {
+   case ByteMode::QWORD:
+      mode_pref = 0x48;
+      break;
+   case ByteMode::DWORD:
+      break;
+   case ByteMode::WORD:
+      mode_pref = 0x66;
+      break;
+   case ByteMode::BYTE:
+      break;
+   }
+   if (mode_pref && CURRENT_MODE != bm)
+      encoded.prefixes.push_back(mode_pref);
+
+   if (operands.size() == 2)
+   {
+      encoded.has_modregrm = true;
+      if (operands[0].type == OperandType::REGISTER && operands[1].type == OperandType::REGISTER)
+      {
+         if (bm != ByteMode::BYTE)
+            encoded.opcode |= 0b01;
+         encoded.modregrm = 0b11 << 6;
+         encoded.modregrm |= operands[1].value << 3;
+         encoded.modregrm |= operands[0].value;
+      }
+   }
+   else if (operands.size() == 1)
+   {
+      switch (operands[0].type)
+      {
+      case OperandType::IMMEDIATE:
+         for (int i = 0; i < int(bm); i++)
+            encoded.immediate.push_back(operands[0].value << (8 * i) & 0xFF);
+         break;
+      case OperandType::REGISTER:
+         encoded.opcode += operands[0].value;
+         break;
+      case OperandType::MEMORY:
+         //
+         break;
+      }
+   }
+
+   return encoded;
+}
+
+std::vector<std::uint8_t> Instruction::Assemble() const
+{
+   auto out = std::vector<std::uint8_t>();
+   auto encoded = Encode();
+
+   for (const auto& pref : encoded.prefixes)
+      out.push_back(pref);
+
+   out.push_back(encoded.opcode);
+
+   if (encoded.has_modregrm)
+      out.push_back(encoded.modregrm);
+
+   for (const auto& dis : encoded.displacement)
+      out.push_back(dis);
+
+   for (const auto& imm : encoded.immediate)
+      out.push_back(imm);
+
+   return out;
+}
 
 int main()
 {
@@ -315,8 +354,10 @@ int main()
 
    std::ofstream outfile("C:\\msys64\\home\\User\\tpc\\test.bin", std::ios::binary);
    for (const auto& a : output)
-      std::cout << out_hex(a) << std::endl;
+      std::cout << out_hex(a) << " ";
+   std::cout << std::endl;
    outfile.write(reinterpret_cast<const char*>(output.data()), output.size());
+   outfile.close();
 
    return 0;
 }
