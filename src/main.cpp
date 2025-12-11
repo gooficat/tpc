@@ -346,14 +346,25 @@ int main()
    size_t line_num = 0;
    while (std::getline(infile, line))
    {
-      std::cout << line_num++ << ": " << line << std::endl;
+      switch (line.at(0))
+      {
+      case ';':  // comment
+         break;
+      case '.':
+         break;  // denoter
+      case ':':
+         break;  // label
+      default:
+         std::cout << line_num++ << ": " << line << std::endl;
 
-      Instruction instruction(line);
+         Instruction instruction(line);
 
-      instruction.Print();
+         instruction.Print();
 
-      auto assembled = instruction.Assemble();
-      output.insert(output.end(), assembled.begin(), assembled.end());
+         auto assembled = instruction.Assemble();
+         output.insert(output.end(), assembled.begin(), assembled.end());
+         break;
+      }
    }
    infile.close();
 
