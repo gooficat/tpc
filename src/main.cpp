@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+#define out_hex(v) "0x" << std::hex << size_t(v)
+
 enum class OperandType
 {
    IMMEDIATE,
@@ -13,12 +15,12 @@ enum class OperandType
    MEMORY
 };
 
-enum class ByteMode
+enum struct ByteMode : int
 {
-   BYTE,
-   WORD,
-   DWORD,
-   QWORD,
+   BYTE = 1,
+   WORD = 2,
+   DWORD = 4,
+   QWORD = 8,
 };
 
 class Register
@@ -115,7 +117,7 @@ class Operand
          std::cout << "MEMORY";
          break;
       }
-      std::cout << " operand: " << value << std::endl;
+      std::cout << " operand of " << int(min_mode) << " bytes: " << value << std::endl;
    }
 };
 
@@ -162,14 +164,40 @@ class Instruction
          operand.Print();
    }
 
-   EncodedInstruction Encode()
+   EncodedInstruction Encode() const
    {
-      EncodedInstruction encoded;
+      EncodedInstruction encoded{};
 
       encoded.opcode = mnemonics.at(mnemonic);
 
+      ByteMode bm = ByteMode::BYTE;
+
+      for (const auto& op : operands)
+         if (int(op.min_mode) > int(bm))
+            bm = op.min_mode;
+
+      std::uint8_t mode_pref = 0x00;
+      switch (bm)
+      {
+      case ByteMode::QWORD:
+         mode_pref = 0x48;
+         break;
+      case ByteMode::WORD:
+         mode_pref = 0x66;
+      default:;
+      }
+      if (mode_pref)
+         encoded.prefixes.push_back(mode_pref);
+
       if (operands.size() == 2)
       {
+         encoded.has_modregrm = true;
+         if (operands[0].type == OperandType::REGISTER && operands[1].type == OperandType::REGISTER)
+         {
+            encoded.modregrm = 0b11000000;
+            encoded.modregrm |= operands[1].value << 3;
+            encoded.modregrm |= operands[0].value;
+         }
       }
       else if (operands.size() == 1)
       {
@@ -190,7 +218,27 @@ class Instruction
       return encoded;
    }
 
-   void Assemble() {}
+   std::vector<std::uint8_t> Assemble() const
+   {
+      auto out = std::vector<std::uint8_t>();
+      auto encoded = Encode();
+
+      for (const auto& pref : encoded.prefixes)
+         out.push_back(pref);
+
+      out.push_back(encoded.opcode);
+
+      if (encoded.has_modregrm)
+         out.push_back(encoded.modregrm);
+
+      for (const auto& dis : encoded.displacement)
+         out.push_back(dis);
+
+      for (const auto& imm : encoded.immediate)
+         out.push_back(imm);
+
+      return out;
+   }
 };
 
 int main()
@@ -207,6 +255,11 @@ int main()
       Instruction instruction(line);
 
       instruction.Print();
+
+      auto assembled = instruction.Assemble();
+
+      for (const auto& a : assembled)
+         std::cout << out_hex(a) << std::endl;
    }
 
    return 0;
