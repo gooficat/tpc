@@ -207,7 +207,7 @@ EncodedInstruction SpecialFill(const Instruction& instruction)
    }
    for (size_t i = 0; i < instruction.operands[1].value - 1; i++)
    {
-      for (int j = 0; j < int(instruction.mode); j++)
+      for (int j = 0; j < int(instruction.operands[0].min_mode); j++)
       {
          out.immediate.push_back((instruction.operands[0].value << (8 * j)) & 0xFF);
       }
