@@ -70,6 +70,11 @@ static const std::unordered_map<std::string, Register> registers = {
     {"cl", {1, ByteMode::BYTE}},  //
     {"dl", {2, ByteMode::BYTE}},  //
     {"bl", {3, ByteMode::BYTE}},  //
+
+    {"es", {0, ByteMode::BYTE}},  //
+    {"cs", {1, ByteMode::BYTE}},  //
+    {"ss", {2, ByteMode::BYTE}},  //
+    {"ds", {3, ByteMode::BYTE}},  //
 };
 
 static const std::unordered_map<std::string, std::uint8_t> mnemonics = {
@@ -80,6 +85,7 @@ static const std::unordered_map<std::string, std::uint8_t> mnemonics = {
     {"xor", 0x30},     //
     {"int", 0xCD},     //
     {"jmpn", 0xEB},    //
+    {"hlt", 0xF4},     //
                        //
     {"mov_ax", 0xB8},  //
     {"mov_cx", 0xB9},  //
@@ -98,6 +104,8 @@ static const std::unordered_map<std::string, std::uint8_t> mnemonics = {
     {"mov_ch", 0xB5},  //
     {"mov_dh", 0xB6},  //
     {"mov_bh", 0xB7},  //
+
+    {"mov_seg", 0x8D},  // technically off by 1 but this avoids an issue
 
     {"nop", 0x90},
 
@@ -127,7 +135,7 @@ class Operand
          size_t beg = arg.find('[') + 1;
          size_t end = arg.find(']');
          std::string contents = arg.substr(beg, end - beg);
-         std::cout << "Memory access from " << contents << std::endl;
+         // std::cout << "Memory access from " << contents << std::endl;
          value = std::stoull(contents, nullptr, 0);
          // TODO: parse for offset stuff. Also need a more complex system for how to tell what kind
          // of offset it has. Some may have a register involved, and then an immediate.
@@ -278,7 +286,7 @@ EncodedInstruction Instruction::Encode(const std::unordered_map<std::string, std
       if (operands[0].type == OperandType::REGISTER && operands[1].type == OperandType::REGISTER)
       {
          if (bm != ByteMode::BYTE)
-            encoded.opcode |= 0b01;
+            encoded.opcode += 0b01;
          encoded.modregrm = 0b11 << 6;
          encoded.modregrm |= operands[1].value << 3;
          encoded.modregrm |= operands[0].value;
@@ -345,11 +353,11 @@ void ParseLine(const std::string& line, std::unordered_map<std::string, std::uin
       labels.insert({line.substr(1), output.size()});
       break;  // label
    default:
-      std::cout << "line:" << line << std::endl;
+      // std::cout << "line:" << line << std::endl;
 
       Instruction instruction(line);
 
-      instruction.Print();
+      // instruction.Print();
 
       auto assembled = instruction.Assemble(labels, output.size());
       output.insert(output.end(), assembled.begin(), assembled.end());
@@ -364,20 +372,20 @@ void ParseDenoterLine(const std::string& line,
    auto op_index = line.find(' ');
    auto mnemonic = line.substr(1, op_index - 1);
 
-   std::cout << "Special line " << line << std::endl;
-   std::cout << "Mnemonic |" << mnemonic << "|" << std::endl;
+   // std::cout << "Special line " << line << std::endl;
+   // std::cout << "Mnemonic |" << mnemonic << "|" << std::endl;
 
    if (mnemonic == "db")
    {
       auto op1_end = line.find(' ', op_index);
       auto op1 = line.substr(op_index + 1, op1_end + 2);
-      std::cout << "Denote byte: " << op1 << std::endl;
+      // std::cout << "Denote byte: " << op1 << std::endl;
       output.push_back(static_cast<std::uint8_t>(std::strtoul(op1.c_str(), nullptr, 0)));
    }
 
    else if (mnemonic == "times")
    {
-      std::cout << "Multiplier denoter" << std::endl;
+      // std::cout << "Multiplier denoter" << std::endl;
       auto op1_end = line.find(' ', op_index + 1);
       auto op1 = line.substr(op_index + 1, op1_end + 2);  // comma space for the sake of consistency
 
@@ -411,8 +419,8 @@ int main(int argc, char* argv[])
    std::ofstream outfile(argc == 3 ? argv[2] : "C:/msys64/home/User/tpc/test.bin",
                          std::ios::binary);
    assert(outfile && "Could not find the file specified");
-   for (const auto& a : output)
-      std::cout << out_hex(a) << " ";
+   // for (const auto& a : output)
+   //    std::cout << out_hex(a) << " ";
    std::cout << std::endl << std::dec << output.size() << " bytes written" << std::endl;
    outfile.write(reinterpret_cast<const char*>(output.data()), output.size());
    outfile.close();
