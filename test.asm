@@ -1,1 +1,1 @@
-mov rax, [0x0123456789ABCDEF]
+mov rax, 0x0123456789ABCDEF

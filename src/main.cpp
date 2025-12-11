@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -73,6 +74,17 @@ class Operand
          value = std::stoull(contents, nullptr, 0);
          // TODO: parse for offset stuff. Also need a more complex system for how to tell what kind
          // of offset it has. Some may have a register involved, and then an immediate.
+         // the segment may also be needed.
+         // it might be good to actually make dereference be a boolean and the type not be specific
+         // for memory
+         if (value <= UINT8_MAX)
+            min_mode = ByteMode::BYTE;
+         else if (value <= UINT16_MAX)
+            min_mode = ByteMode::WORD;
+         else if (value <= UINT32_MAX)
+            min_mode = ByteMode::DWORD;
+         else
+            min_mode = ByteMode::QWORD;
       }
       else
       {
@@ -107,6 +119,19 @@ class Operand
    }
 };
 
+struct EncodedInstruction
+{
+   using byte = std::uint8_t;
+   std::vector<byte> prefixes;
+   byte opcode;
+   byte modregrm;
+   bool has_modregrm;
+   byte sib;
+   bool has_sib;
+   std::vector<byte> displacement;
+   std::vector<byte> immediate;
+};
+
 class Instruction
 {
  public:
@@ -136,6 +161,36 @@ class Instruction
       for (const auto& operand : operands)
          operand.Print();
    }
+
+   EncodedInstruction Encode()
+   {
+      EncodedInstruction encoded;
+
+      encoded.opcode = mnemonics.at(mnemonic);
+
+      if (operands.size() == 2)
+      {
+      }
+      else if (operands.size() == 1)
+      {
+         switch (operands[0].type)
+         {
+         case OperandType::IMMEDIATE:
+            //
+            break;
+         case OperandType::REGISTER:
+            //
+            break;
+         case OperandType::MEMORY:
+            //
+            break;
+         }
+      }
+
+      return encoded;
+   }
+
+   void Assemble() {}
 };
 
 int main()
