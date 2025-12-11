@@ -281,7 +281,7 @@ EncodedInstruction Instruction::Encode(const std::unordered_map<std::string, std
       {
       case OperandType::IMMEDIATE:
          for (int i = 0; i < int(bm); i++)
-            encoded.immediate.push_back((operands[0].value << (8 * i)) & 0xFF);
+            encoded.immediate.push_back((operands[0].value >> (8 * i)) & 0xFF);
          break;
       case OperandType::REGISTER:
          encoded.opcode += operands[0].value & 0xFF;
@@ -404,7 +404,7 @@ int main(int argc, char* argv[])
    assert(outfile && "Could not find the file specified");
    for (const auto& a : output)
       std::cout << out_hex(a) << " ";
-   std::cout << std::endl;
+   std::cout << std::endl << std::dec << output.size() << " bytes written" << std::endl;
    outfile.write(reinterpret_cast<const char*>(output.data()), output.size());
    outfile.close();
 

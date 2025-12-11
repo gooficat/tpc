@@ -3,9 +3,9 @@
 ; as of right now, hexadecimal is unsupported
 :start
 xor ax, ax
-mov_ax 0x0010
+mov_ax 0x1310
 int 0x10
-jmpn 0
-.times 501, .db 0
-.db 0xaa
+jmpn 0xff
+.times 501, .db 0x67
 .db 0x55
+.db 0xaa
