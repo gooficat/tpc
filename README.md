@@ -1,11 +1,11 @@
-# tpc
+# TPC
 
-A C project created with the VSCode C Project Generator extension.
+A CPP project created with the VSCode CPP Project Generator extension.
 
 ## Prerequisites
 
 - CMake 3.15 or higher
-- GCC/Clang C compiler
+- GCC/Clang C++ compiler
 - vcpkg (optional, for package management)
 
 ## Building
@@ -30,13 +30,13 @@ cmake ..
 cmake --build .
 
 # Run
-./tpc
+./TPC
 ```
 
 ## Project Structure
 
 ```
-tpc/
+TPC/
 ├── .vscode/              # VSCode configuration
 ├── src/                  # Source files
 ├── include/              # Header files
@@ -52,7 +52,7 @@ tpc/
 
 ## Features
 
-- Modern C standards (C17)
+- Modern CPP standards (C++20)
 - CMake build system
 - vcpkg integration for package management
 - Clang-format for code formatting
