@@ -90,6 +90,15 @@ static const std::unordered_map<std::string, std::uint8_t> mnemonics = {
     {"mov_si", 0xBE},  //
     {"mov_di", 0xBF},  //
 
+    {"mov_al", 0xB0},  //
+    {"mov_cl", 0xB1},  //
+    {"mov_dl", 0xB2},  //
+    {"mov_bl", 0xB3},  //
+    {"mov_ah", 0xB4},  //
+    {"mov_ch", 0xB5},  //
+    {"mov_dh", 0xB6},  //
+    {"mov_bh", 0xB7},  //
+
     {"nop", 0x90},
 
 };  // I should probably add a way to have the same mnemonic for different instructions depending on
