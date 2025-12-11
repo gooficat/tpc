@@ -1,5 +1,21 @@
 # TPC
 
+An embeddable, platform nonspecific x64 assembler made in c++
+note: This project is by no means complete or user-ready
+
+It uses a strict syntax. Little to no variation is allowed. You will see the syntax in the example file `test.asm`
+Each line contains exactly one instruction, and there is no whitespace variation allowed
+A comment may be specified with a ; as the first character of a line
+
+
+
+
+
+
+
+
+the following is from the VSCode CPP Project Generator extension, it may be helpful for setting up the project to build it
+
 A CPP project created with the VSCode CPP Project Generator extension.
 
 ## Prerequisites
